@@ -5,6 +5,11 @@
 
 **11795676 Eduardo Garcia de Gaspari Valdejão**
 
+This exercise demonstrates bare-metal programming using BIOS interrupts to detect system memory. The challenge involves:
+1. Writing a custom assembly function (`call_mem`) that queries conventional memory size via BIOS interrupt `0x12`.
+2. Integrating the function with a minimal C runtime (`main.c`) to print the result.
+3. Building and running the code in a QEMU emulator without an operating system.
+
 # Our Solution
 ## 1. Funcion added in libc.S
 
@@ -54,6 +59,12 @@ gcc -m16 main.o libc.o -nostartfiles -nostdlib -T hello.ld -orphan-handling=disc
 ```
 
 # How to Build and Run
+
+### Dependencies
+- GCC (with `-m16` support)
+- GNU Make
+- QEMU (i386 emulator)
+- (Optional) GTK3 for graphical QEMU output
 
 1. **Clone the repository**:
    ```bash
