@@ -1,4 +1,6 @@
-# Names
+# SysSoft JOTA Quest - Memory Detection via BIOS
+
+## Names
 **10748500 João Francisco Caprioli Barbosa Camargo de Pinho**
 
 **11795676 Eduardo Garcia de Gaspari Valdejão**
@@ -50,3 +52,38 @@ main.c:26:16: warning: implicit declaration of function ‘call_mem’ [-Wimplic
       |                ^~~~~~~~
 gcc -m16 main.o libc.o -nostartfiles -nostdlib -T hello.ld -orphan-handling=discard -o hello.bin
 ```
+
+# How to Build and Run
+
+1. **Clone the repository**:
+   ```bash
+   git clone [repository-url]
+   cd syssoft-jota-quest/
+   ```
+
+2. **Clean previous builds** (if any):
+   ```bash
+   rm -f main.o hello.bin
+   ```
+
+3. **Build the binary**:
+   ```bash
+   make hello.bin
+   ```
+
+4. **Run in QEMU** (choose one method):
+
+   - **Graphical mode** (requires GTK):
+     ```bash
+     make hello.bin/run
+     ```
+     *If you get GTK errors, install dependencies:*
+     ```bash
+     sudo apt install qemu-system-x86 libgtk-3-dev  # Debian/Ubuntu
+     ```
+
+   - **Text-only mode** (recommended for SSH/headless):
+     ```bash
+     qemu-system-i386 -nographic -drive format=raw,file=hello.bin -net none
+     ```
+     *(Press `Ctrl+A` then `X` to exit QEMU)*
