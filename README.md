@@ -9,7 +9,7 @@
 *This work derives from SYSeg (https://gitlab.com/monaco/syseg)*
 
 This exercise demonstrates bare-metal programming using the BIOS service. The challenge involves:
-1. Study of the code provided.
+1. Studying the code provided.
 2. Writing a custom assembly function that uses the BIOS service.
 3. Integrating the function with a minimal C runtime (`main.c`) to print the result.
 4. Building and running the code in a QEMU emulator without an operating system.
