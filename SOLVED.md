@@ -18,8 +18,8 @@ In ```main.c```, we call the function:
 ```
 however, as we only have access of an implementation of ```printf``` that prints strings (```char*```), we need to convert the number to a string.
 
-# 3. Converting with atoi
-To convert the number to a string we implemented ```atoi``` by hand. With its use, we can finally print the amount of conventional memory:
+# 3. Converting with itoa
+To convert the number to a string we implemented ```itoa``` by hand. With its use, we can finally print the amount of conventional memory:
 ```C
   printf(itoa(mem_kb));
 ```
