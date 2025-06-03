@@ -67,6 +67,7 @@ gcc -m16 main.o libc.o -nostartfiles -nostdlib -T hello.ld -orphan-handling=disc
 - QEMU (i386 emulator)
 - (Optional) GTK3 for graphical QEMU output
 
+### Instructions
 1. **Clone the repository**:
    ```bash
    git clone [repository-url]
