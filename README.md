@@ -6,10 +6,13 @@
 **11795676 Eduardo Garcia de Gaspari Valdejão**
 
 # Project Description
-This exercise demonstrates bare-metal programming using BIOS interrupts to detect system memory. The challenge involves:
-1. Writing a custom assembly function (`call_mem`) that queries conventional memory size via BIOS interrupt `0x12`.
-2. Integrating the function with a minimal C runtime (`main.c`) to print the result.
-3. Building and running the code in a QEMU emulator without an operating system.
+*This work derives from SYSeg (https://gitlab.com/monaco/syseg)*
+
+This exercise demonstrates bare-metal programming using the BIOS service. The challenge involves:
+1. Study of the code provided.
+2. Writing a custom assembly function that uses the BIOS service.
+3. Integrating the function with a minimal C runtime (`main.c`) to print the result.
+4. Building and running the code in a QEMU emulator without an operating system.
 
 # Our Solution
 ## 1. Funcion added in libc.S
