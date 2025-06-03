@@ -5,7 +5,7 @@
 
 **11795676 Eduardo Garcia de Gaspari Valdejão**
 
-# Project DEscription
+# Project Description
 This exercise demonstrates bare-metal programming using BIOS interrupts to detect system memory. The challenge involves:
 1. Writing a custom assembly function (`call_mem`) that queries conventional memory size via BIOS interrupt `0x12`.
 2. Integrating the function with a minimal C runtime (`main.c`) to print the result.
