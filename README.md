@@ -5,7 +5,7 @@
 
 **11795676 Eduardo Garcia de Gaspari Valdejão**
 
-# Our solution:
+# Our Solution
 ## 1. Funcion added in libc.S
 
 The function we chose to create is called ```call_mem```. It uses BIOS interrupt **0x12** to get the amount of conventional memory in kilobytes. The result is returned, as an ```int``` of course, in ```%ax```.
