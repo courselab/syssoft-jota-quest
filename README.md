@@ -1,4 +1,4 @@
-# SysSoft JOTA Quest - Memory Detection via BIOS
+# SysSoft Jota Quest - Memory Detection via BIOS
 
 ## Names
 **10748500 João Francisco Caprioli Barbosa Camargo de Pinho**
