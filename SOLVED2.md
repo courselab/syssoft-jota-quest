@@ -1,5 +1,3 @@
----
-
 # SYSeg – SOLVED Questions
 
 ## p1.c – Explain the results
