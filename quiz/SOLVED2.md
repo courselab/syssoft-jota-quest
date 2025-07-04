@@ -59,7 +59,7 @@ It disables both stack protection and position independence — intentionally ma
 
 If we input a long string such as `youshallnotpass`, it overflows `user_key[10]` and may overwrite the nearby `verified` variable, granting unauthorized access.
 
-However, even though the Makefile tries to disable stack protection with -fno-stack-protector, some compilers or distributions enable it by default or override your flags. Not only that, some systems use hardened runtime checks, where buffer overflows are caught and prevented; as well as some architectures or compiler versions may place variables in different orders (or apply optimizations) that reduce overflow impact.
+However, even though the Makefile tries to disable stack protection with `-fno-stack-protector`, some compilers or distributions enable it by default or override your flags. Not only that, some systems use hardened runtime checks, where buffer overflows are caught and prevented; as well as some architectures or compiler versions may place variables in different orders (or apply optimizations), reducing overflow impact.
 
 ### Fixing in p2fix.c
 
@@ -73,8 +73,8 @@ int main(void) {
   char user_key[10];
 
   printf("Enter password: ");
-  fgets(user_key, sizeof(user_key), stdin);
-  user_key[strcspn(user_key, "\n")] = '\0';
+  fgets(user_key, sizeof(user_key), stdin);  // replaced scanf with fgets for safe bounded input
+  user_key[strcspn(user_key, "\n")] = '\0';  // removes the newline character left by fgets
 
   if (!strcmp(user_key, "foo"))
     verified = 1;
@@ -100,6 +100,10 @@ p2fix : p2fix.c
 
 ---
 
+Here's the updated and corrected version of the **p3.c solution**, maintaining the original Markdown structure and incorporating important clarifications about 64-bit vs 32-bit behavior based on the `Makefile` provided:
+
+---
+
 ## p3.c – Explain the function calls
 
 ### Build details
@@ -112,57 +116,111 @@ gcc -Wall -m32 -O0 -fno-pic -fno-pie -Wl,-no-pie p3.c -o p3
 
 This ensures:
 
-* 32-bit mode
-* No compiler optimizations
-* No PIE or PIC
-* Simple, predictable stack frame setup
+* Compilation in **32-bit mode** using the `-m32` flag
+* No optimizations (`-O0`), which preserves full function prologues and variable usage
+* No position-independent code (`-fno-pic`, `-fno-pie`)
+* A classic, non-PIE ELF binary layout
+
+> Note: On some systems, the compiler may silently fall back to 64-bit mode if the necessary multilib (32-bit) toolchain is not installed. If this happens, the disassembly will reflect 64-bit conventions instead of 32-bit. All the following explanations assume that the compilation was indeed in 32-bit mode as intended.
+
+---
 
 ### a) How `foo` calls `bar`
 
-The `call` instruction is preceded by `push` to pass the argument. This follows the **cdecl** calling convention, where:
+In 32-bit mode, the `cdecl` calling convention is used:
 
-* Arguments go on the stack
-* Caller cleans up afterward
+* The caller (`foo`) **pushes the argument** onto the stack using the `push` instruction.
+* Then, `call bar` transfers control to the callee.
+* The **caller is responsible for cleaning up the stack** after the call.
 
-Defined by the **System V x86 ABI**.
+This behavior matches the **System V ABI** for the x86 (IA-32) architecture, which defines stack-based parameter passing from right to left.
+
+> In contrast, 64-bit System V ABI (used when `-m32` is not applied) passes the first arguments via registers like `%rdi`, `%rsi`, etc.
+
+---
 
 ### b) How `bar` returns
 
-`bar` uses `%eax` to return the result — standard for integer return values in the x86 ABI. This convention is portable and OS-independent.
+The return value of `bar` is stored in the `%eax` register (in 32-bit mode). This register is used for returning integers and pointers.
+
+* After `bar` returns, its result is already in `%eax`.
+* `foo` uses this value directly or stores it in a local variable.
+
+> In 64-bit mode, the same logic applies, but the return value would be stored in `%rax`. The principle of using a dedicated register for return values remains the same across architectures.
+
+---
 
 ### c) Function prologue and epilogue
 
-For example, in `foo`:
+A typical function prologue in 32-bit looks like:
 
 ```asm
-55            push %ebp
-89 e5         mov  %esp, %ebp
-...
-c9            leave
+push %ebp
+mov  %esp, %ebp
+sub  $X, %esp  ; optional, for local variables
 ```
 
-These set up and tear down the stack frame:
+And the epilogue is:
 
-* Save old base pointer
-* Create new frame for locals
-* Restore caller frame
+```asm
+leave
+ret
+```
 
-These are optional in very simple or optimized functions but are required for consistent stack access in standard C code.
+Explanation:
+
+* `push %ebp` saves the previous frame pointer.
+* `mov %esp, %ebp` establishes a new base pointer for the current frame.
+* `leave` is equivalent to `mov %ebp, %esp; pop %ebp` — it restores the previous stack frame.
+
+This structure is necessary when the function uses local variables or accesses arguments via base pointer offsets (e.g., `8(%ebp)`).
+
+> Note: With optimization (`-O1` or higher), these can be omitted if no locals are needed. In 64-bit, modern compilers often omit the frame pointer entirely and use stack-relative offsets or debug info instead.
+
+---
 
 ### d) Purpose of `sub $X, %esp`
 
-This reserves space on the stack for local variables:
+This instruction reserves space on the stack for local variables:
 
 ```asm
-83 ec 18      sub $0x18, %esp
+sub $0x18, %esp
 ```
 
-This aligns the stack and provides space for locals. This is part of x86 ABI compliance (e.g., 16-byte alignment).
+Meaning:
+
+* 24 bytes of space are reserved for locals or alignment padding.
+* Stack alignment is critical, particularly when calling library functions or using SIMD instructions.
+
+In the 32-bit System V ABI, stack alignment is typically to 4 bytes, but compilers may align to higher values (e.g., 16 bytes) to be safe or compatible with other ABIs.
+
+> In 64-bit ABI, alignment requirements are stricter: the stack must be 16-byte aligned before a function call.
+
+---
 
 ### e) Return type change
 
-When `bar()` is changed to return `char`, the return still goes via `%eax`, but only the lowest byte is valid. The disassembly shows simpler instructions or truncation logic. Declaring function prototypes is crucial so the compiler handles arguments and return types correctly.
+If you change `bar`'s return type from `int` to `char`:
 
+```c
+char bar(int m) {
+  char b = m + 1;
+  return b;
+}
+```
+
+Behavior:
+
+* The compiler still uses `%eax` to store the return value.
+* Only the **lower 8 bits** (`%al`) are meaningful.
+* If the caller (`foo`) expects an `int`, and `bar` returns `char`, **sign-extension** or zero-extension may occur.
+
+**Why prototypes matter**:
+
+* If `bar` is implicitly declared or misdeclared, the compiler may generate incorrect code for argument passing or return value handling.
+* Declaring `int bar(int);` or `char bar(int);` before `main()` ensures that type expectations are matched correctly during compilation.
+
+> Note: In 64-bit mode, return values smaller than 32 bits are also placed in `%al`, but the full 64-bit `%rax` may be zero- or sign-extended depending on the type. Type declarations remain critical for correctness in both architectures.
 ---
 
 ## p4.c – How libraries work
