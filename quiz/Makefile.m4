@@ -6,12 +6,12 @@ dnl    This file is part of SYSeg, available at https://gitlab.com/monaco/syseg.
 
 include(docm4.m4)dnl
 
-all : p1 p2 p3 p4-v1 p4-v2 p4-v3
+all : p1 p2fix p3 p4-v1 p4-v2 p4-v3
 
 p1 : p1.c
 	gcc -m32 $< -o $@
 
-p2 : p2.c
+p2fix : p2fix.c
 	gcc -Wall -m32  -O0 -fno-stack-protector -fno-pic -fno-pie -Wl,-no-pie $(CFLAGS) $<  -o $@
 
 p3 : p3.c
