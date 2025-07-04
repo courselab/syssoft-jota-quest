@@ -24,7 +24,7 @@ p4-v2 : p4.o libp4.a
 	gcc -m32 $< -L. -Wl,-Bstatic -lp4 -Wl,-Bdynamic -o $@
 
 p4-v3 : p4.o libp4.so
-	gcc -m32 $< -L. -lp4 -o $@
+        gcc -m32 $< -L. -Wl,-rpath,'$$ORIGIN' -lp4 -o $@
 
 p4.o p4a.o p4b.o : %.o : %.c
 	gcc -m32 -c $< -o $@
