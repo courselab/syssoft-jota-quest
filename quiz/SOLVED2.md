@@ -21,9 +21,27 @@ Running `make p1` builds it with:
 gcc -m32 p1.c -o p1
 ```
 
+When executed multiple times, the address of `main` varies with each run, for example:
+
+```
+0x5609c4481149
+0x55e5c899d149
+0x5581fc6d7149
+0x561eb1dad149
+```
+
 ### Explanation
 
-This creates a 32-bit **non-PIE executable**. Without PIE (Position Independent Executable), the program is always loaded at a fixed address, so the printed address of `main` is the same across executions.
+The changing addresses occur because the executable is compiled as a **PIE (Position Independent Executable)** and the system has **ASLR (Address Space Layout Randomization)** enabled.
+
+* **PIE** allows the program’s code to be loaded at different memory locations each time it runs.
+* **ASLR** randomizes memory layout for security, making addresses unpredictable.
+
+On many modern systems, even when compiling for 32-bit (`-m32`), compilers default to producing PIE binaries unless explicitly disabled.
+
+### Fixed address scenario
+
+If PIE is disabled (e.g., by compiling with `-no-pie`), the executable is loaded at a fixed memory address, resulting in the same `main` address being printed on each execution.
 
 ---
 
@@ -40,6 +58,8 @@ gcc -Wall -m32 -O0 -fno-stack-protector -fno-pic -fno-pie -Wl,-no-pie p2.c -o p2
 It disables both stack protection and position independence — intentionally making it vulnerable for educational purposes.
 
 If we input a long string such as `youshallnotpass`, it overflows `user_key[10]` and may overwrite the nearby `verified` variable, granting unauthorized access.
+
+However, even though the Makefile tries to disable stack protection with -fno-stack-protector, some compilers or distributions enable it by default or override your flags. Not only that, some systems use hardened runtime checks, where buffer overflows are caught and prevented; as well as some architectures or compiler versions may place variables in different orders (or apply optimizations) that reduce overflow impact.
 
 ### Fixing in p2fix.c
 
