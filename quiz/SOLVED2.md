@@ -100,10 +100,6 @@ p2fix : p2fix.c
 
 ---
 
-Here's the updated and corrected version of the **p3.c solution**, maintaining the original Markdown structure and incorporating important clarifications about 64-bit vs 32-bit behavior based on the `Makefile` provided:
-
----
-
 ## p3.c – Explain the function calls
 
 ### Build details
@@ -238,6 +234,8 @@ p4-v3: p4.o libp4.so
 	gcc -m32 $< -L. -lp4 -o $@
 ```
 
+---
+
 ### a) Running each version
 
 ```bash
@@ -246,76 +244,182 @@ p4-v3: p4.o libp4.so
 ./p4-v3
 ```
 
-All print:
+* Both `p4-v1` and `p4-v2` print:
 
-```
-Foo
-```
+  ```
+  Foo
+  ```
 
-However, `p4-v3` may fail if `libp4.so` is not found. To ensure it works regardless of location, add `rpath`:
+* Running `p4-v3` results in:
 
-```make
--Wl,-rpath,'$ORIGIN'
-```
+  ```
+  ./p4-v3: error while loading shared libraries: libp4.so: cannot open shared object file: No such file or directory
+  ```
 
-Modified `p4-v3` rule:
+This occurs because the dynamic linker cannot find `libp4.so` at runtime.
+
+**To fix this**, modify the `p4-v3` build rule to embed a runtime search path (`rpath`) pointing to the executable’s directory:
 
 ```make
 p4-v3: p4.o libp4.so
 	gcc -m32 $< -L. -Wl,-rpath,'$$ORIGIN' -lp4 -o $@
 ```
 
+`$$ORIGIN` tells the loader to look for shared libraries relative to the executable location, ensuring `libp4.so` is found regardless of the current working directory.
+
+Running again:
+
+```bash
+make clean
+make p4-v3
+./p4-v3
+```
+
+* Resulting:
+  ```
+  Foo
+  ```
+
+---
+
 ### b) Size comparison
 
-Use:
+Check file sizes with:
 
 ```bash
 ls -lh p4-v*
 ```
 
-* `p4-v1`: largest — includes all objects
-* `p4-v2`: smaller — links static `.a`
-* `p4-v3`: smallest — depends on dynamic `.so`
+Typical results:
+
+* `p4-v1`: largest size — all objects linked directly into the binary
+* `p4-v2`: smaller — links static library `.a`
+* `p4-v3`: smallest — dynamically links shared library `.so`, binary only contains loader references
+
+Since the program is trivial (only calls foo() printing "Foo"), the overall binary is tiny, and the overhead of ELF headers, runtime startup, and standard libs dominates the file size (~15 KB), making the difference negligible.
+
+---
 
 ### c) Symbol table comparison
 
-Use `nm`:
+Use `nm` to inspect the symbol resolution in each version:
 
 ```bash
 nm p4-v1 | grep foo
 nm p4-v2 | grep foo
 nm p4-v3 | grep foo
+
+nm p4-v1 | grep bar
+nm p4-v2 | grep bar
+nm p4-v3 | grep bar
 ```
 
-* `T`: defined symbol
-* `U`: undefined (resolved at runtime)
+Results:
 
-Only dynamic version shows `U`.
+* `p4-v1` shows:
 
-### d) Dynamic section
+  ```
+  000011b3 T foo
+  000011de T bar
+  ```
 
-Use `readelf -d`:
+  Both functions `foo` and `bar` are **defined inside the executable** (`T` = text section symbol defined in the binary).
+
+* `p4-v2` shows:
+
+  ```
+  000011b3 T foo
+  ```
+
+  `foo` is defined in the static library (`libp4.a`) and included in the executable.
+  `bar` is not included because it is **not called** — static linking includes only the used parts of the library.
+
+* `p4-v3` shows:
+
+  ```
+           U foo
+  ```
+
+  `foo` is **undefined** (`U`) in the executable because it is expected to be resolved at **runtime** by the dynamic linker using `libp4.so`.
+  `bar` is also not listed because it is not used, and the dynamic linker only resolves needed symbols.
+
+**Interpretation:**
+
+| Version | `foo` | `bar` | Notes                                                |
+| ------- | ----- | ----- | ---------------------------------------------------- |
+| `p4-v1` | `T`   | `T`   | Both symbols are linked directly (object files used) |
+| `p4-v2` | `T`   | —     | Only `foo` is included from the static library       |
+| `p4-v3` | `U`   | —     | `foo` expected to be resolved at runtime             |
+
+Use of `T` and `U` symbols aligns with how static and dynamic linking works:
+
+* `T`: Defined in the executable
+* `U`: Undefined — to be resolved externally at link or load time
+
+> Note: In both `p4-v2` and `p4-v3`, `bar` is excluded because it is never referenced in the program. Static and dynamic linkers avoid unnecessary inclusion of unused symbols to reduce size and overhead.
+
+---
+
+### d) Dynamic section inspection
+
+Inspect shared library dependencies with:
 
 ```bash
+readelf -d p4-v1
+readelf -d p4-v2
 readelf -d p4-v3
 ```
 
-Shows:
+#### Observations
 
-```
-Shared library: [libp4.so]
-```
+* **`p4-v1` and `p4-v2`** both have:
 
-This tells the dynamic linker to resolve symbols using `libp4.so`.
+  ```
+  NEEDED             Shared library: [libc.so.6]
+  ```
+
+  This means:
+
+  * Both binaries link dynamically to the C standard library (`libc.so.6`)
+  * Even though `p4-v2` uses a static custom library (`libp4.a`), the system library is still dynamically linked
+
+* **`p4-v3`** includes:
+
+  ```
+  NEEDED             Shared library: [libp4.so]
+  NEEDED             Shared library: [libc.so.6]
+  RUNPATH            Library runpath: [$ORIGIN]
+  ```
+
+  This means:
+
+  * `p4-v3` depends on `libp4.so` at runtime
+  * The `RUNPATH` of `$ORIGIN` was correctly added via the `-Wl,-rpath,'$$ORIGIN'` linker flag, which ensures the dynamic linker will search for `libp4.so` in the same directory as the executable
+
+#### Interpretation
+
+* `p4-v1`: all object files linked directly into the binary, only standard libraries resolved dynamically
+* `p4-v2`: static custom library (`libp4.a`), dynamic standard libraries
+* `p4-v3`: dynamic custom and standard libraries
+
+#### How the dynamic linker uses this
+
+At runtime, the kernel's loader (`ld-linux.so.2` on x86) reads the **dynamic section** to find out which `.so` files must be loaded. The `NEEDED` and `RUNPATH` entries in `p4-v3` tell it:
+
+1. Load `libp4.so` from the same directory as the executable
+2. Load `libc.so.6` from the system paths
+3. Resolve all undefined symbols from those libraries before handing control to the program
+
+---
 
 ### e) Static vs dynamic libraries
 
-| Scenario                   | Static        | Dynamic               |
-| -------------------------- | ------------- | --------------------- |
-| Deploying on other systems | Easier        | Requires .so files    |
-| Updating library           | Needs rebuild | Auto-inherits changes |
-| RAM usage across programs  | Duplicated    | Shared                |
-| Binary size                | Larger        | Smaller               |
+| Scenario                                     | Static Library                           | Dynamic Library                          |
+| -------------------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| Deploying on other systems                   | Easier, single executable, no .so needed | Must provide `.so` files or install them |
+| Updating the library                         | Requires recompilation of executables    | Updated `.so` is used automatically      |
+| RAM usage when multiple apps use the library | Each executable loads its own copy       | Shared code loaded once in memory        |
+| Binary size                                  | Larger executable size                   | Smaller executables                      |
 
 ---
 
@@ -323,28 +427,31 @@ This tells the dynamic linker to resolve symbols using `libp4.so`.
 
 ### a) Static library
 
-* `.a` archive embedded in binary
-* Fast, portable, no runtime dependencies
-* Larger executables
+* Archive `.a` with object files
+* Linked into executable at compile time
+* No runtime dependencies
+* Larger executable size, less flexible updates
 
-### b) Dynamic with relocatable code
+### b) Dynamic library with relocatable code (non-PIC)
 
-* Not PIC, but still shared at runtime
-* May require runtime relocations
-* Moderate overhead
+* Code relocatable at load time
+* Shared at runtime but may cause runtime overhead for relocations
+* Less efficient and flexible than PIC
 
-### c) Dynamic with PIC
+### c) Dynamic library with position-independent code (PIC)
 
-* Fully position-independent
-* Efficient sharing across processes
-* Preferred for `.so` on modern systems
+* Fully position-independent, no relocation overhead
+* Efficient memory sharing between processes
+* Preferred for modern `.so` libraries
 
 ### Summary
 
-| Type            | Portability | Efficiency | Updateable | Sharing |
-| --------------- | ----------- | ---------- | ---------- | ------- |
-| Static          | High        | Low        | No         | No      |
-| Dynamic (reloc) | Medium      | Medium     | Yes        | Yes     |
-| Dynamic (PIC)   | High        | High       | Yes        | Yes     |
+| Type            | Portability | Efficiency | Updatable | Memory Sharing |
+| --------------- | ----------- | ---------- | --------- | -------------- |
+| Static          | High        | Low        | No        | No             |
+| Dynamic (reloc) | Medium      | Medium     | Yes       | Yes            |
+| Dynamic (PIC)   | High        | High       | Yes       | Yes            |
+
+---
 
 ---
